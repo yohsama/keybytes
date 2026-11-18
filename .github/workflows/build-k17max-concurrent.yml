@@ -1,0 +1,61 @@
+name: Build Keychron K17 Max Concurrent Macros
+on:
+  push:
+    branches:
+      - build/k17max-concurrent-20261119
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    container:
+      image: ghcr.io/qmk/qmk_cli:latest
+    steps:
+      - name: Clone Keychron QMK 2025q3
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory '*'
+          git clone --depth 1 --branch 2025q3 https://github.com/CalcProgrammer1/keychron_qmk.git keychron_qmk
+          git -C keychron_qmk submodule update --init --recursive --depth 1
+      - name: Add Concurrent Macros community module
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/yeroca/qmk_concurrent_macros.git keychron_qmk/modules/qmk_concurrent_macros
+          cat > keychron_qmk/keyboards/keychron/k17_max/ansi_encoder/rgb/keymaps/keychron/keymap.json <<'JSON'
+          {
+            "modules": [
+              "qmk_concurrent_macros/concurrent_macros"
+            ]
+          }
+          JSON
+          echo '=== Firmware source versions ==='
+          git -C keychron_qmk rev-parse HEAD
+          git -C keychron_qmk/modules/qmk_concurrent_macros rev-parse HEAD
+      - name: Compile K17 Max ANSI Encoder RGB with VIA
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd keychron_qmk
+          qmk compile -kb keychron/k17_max/ansi_encoder/rgb -km keychron -j 2
+      - name: Collect binary and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          find keychron_qmk -maxdepth 1 -type f -name '*.bin' -print
+          binary="$(find keychron_qmk -maxdepth 1 -type f -name '*.bin' | head -n 1)"
+          test -n "$binary"
+          cp "$binary" artifacts/K17_Max_ANSI_Knob_RGB_Concurrent_Macros.bin
+          (cd artifacts && sha256sum *.bin > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
+      - name: Upload compiled firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: K17-Max-ANSI-Knob-RGB-Concurrent-Macros
+          path: artifacts/
+          if-no-files-found: error
