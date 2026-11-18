@@ -1,8 +1,8 @@
-name: Build Keychron K17 Max Concurrent Macros
+name: Build K17 Max Random Concurrent Macros
 on:
   push:
     branches:
-      - build/k17max-concurrent-20261119
+      - build/k17max-random-concurrent-20261119
 
 permissions:
   contents: read
@@ -14,6 +14,8 @@ jobs:
     container:
       image: ghcr.io/qmk/qmk_cli:latest
     steps:
+      - name: Checkout integration patch
+        uses: actions/checkout@v4
       - name: Clone Keychron QMK 2025q3
         shell: bash
         run: |
@@ -36,6 +38,15 @@ jobs:
           echo '=== Firmware source versions ==='
           git -C keychron_qmk rev-parse HEAD
           git -C keychron_qmk/modules/qmk_concurrent_macros rev-parse HEAD
+          test "$(git -C keychron_qmk rev-parse HEAD)" = "4efcc8c9bf87687c9004079743c80d9a023d531c"
+          test "$(git -C keychron_qmk/modules/qmk_concurrent_macros rev-parse HEAD)" = "38e62a1ad3208436d4c0d456fc674188414d4b87"
+      - name: Apply random timing extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/firmware/patch_random_macros.py
+          grep -n 'case KC_RANDOM_DELAY' keychron_qmk/modules/qmk_concurrent_macros/concurrent_macros/concurrent_macros.c
+          grep -n 'case KC_RANDOM_HOLD' keychron_qmk/modules/qmk_concurrent_macros/concurrent_macros/concurrent_macros.c
       - name: Compile K17 Max ANSI Encoder RGB with VIA
         shell: bash
         run: |
@@ -50,12 +61,12 @@ jobs:
           find keychron_qmk -maxdepth 1 -type f -name '*.bin' -print
           binary="$(find keychron_qmk -maxdepth 1 -type f -name '*.bin' | head -n 1)"
           test -n "$binary"
-          cp "$binary" artifacts/K17_Max_ANSI_Knob_RGB_Concurrent_Macros.bin
+          cp "$binary" artifacts/K17_Max_ANSI_Knob_RGB_Random_Concurrent_Macros.bin
           (cd artifacts && sha256sum *.bin > SHA256SUMS.txt)
           cat artifacts/SHA256SUMS.txt
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
         with:
-          name: K17-Max-ANSI-Knob-RGB-Concurrent-Macros
+          name: K17-Max-ANSI-Knob-RGB-Random-Concurrent-Macros
           path: artifacts/
           if-no-files-found: error
